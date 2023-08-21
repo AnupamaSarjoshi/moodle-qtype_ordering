@@ -21,36 +21,28 @@ Feature: Preview an Ordering question
       | questioncategory | qtype    | name         | template | layouttype |
       | Test questions   | ordering | ordering-001 | moodle   | 0          |
 
-  @javascript @_switch_window
+  @javascript
   Scenario: Preview an Ordering question and submit a correct response.
     When I am on the "ordering-001" "core_question > preview" page logged in as teacher1
+    And I expand all fieldsets
     And I set the field "How questions behave" to "Immediate feedback"
-    And I press "Start again with these options"
-    # The test was unreliable unless if an item randomly started in the right place.
-    # So we first moved each item to the last place, before putting it into the right place.
-    And I drag "Modular" to space "6" in the ordering question
+    And I press "id_saverestart"
     And I drag "Modular" to space "1" in the ordering question
-    And I drag "Object" to space "6" in the ordering question
     And I drag "Object" to space "2" in the ordering question
-    And I drag "Oriented" to space "6" in the ordering question
     And I drag "Oriented" to space "3" in the ordering question
-    And I drag "Dynamic" to space "6" in the ordering question
     And I drag "Dynamic" to space "4" in the ordering question
-    And I drag "Learning" to space "6" in the ordering question
     And I drag "Learning" to space "5" in the ordering question
     And I press "Submit and finish"
     Then the state of "Put these words in order." question is shown as "Correct"
     And I should see "Mark 1.00 out of 1.00"
-    And I switch to the main window
 
-  @javascript @_switch_window
+  @javascript
   Scenario: Preview an Ordering question with show number of correct option.
-    When I choose "Preview" action for "ordering-002" in the question bank
-    And I switch to "questionpreview" window
+    When I am on the "ordering-001" "core_question > preview" page logged in as teacher1
+    And I expand all fieldsets
     And I set the field "How questions behave" to "Immediate feedback"
-    And I press "Start again with these options"
+    And I press "id_saverestart"
     And I drag "Modular" to space "1" in the ordering question
-    And I drag "Object" to space "6" in the ordering question
     And I drag "Oriented" to space "4" in the ordering question
     And I drag "Dynamic" to space "3" in the ordering question
     And I drag "Learning" to space "5" in the ordering question
@@ -59,18 +51,18 @@ Feature: Preview an Ordering question
     And I should see "You have 1 item correct."
     And I should see "You have 5 items partially correct."
 
-  @javascript @_switch_window
+  @javascript
   Scenario: Preview an Ordering question with no show number of correct option.
-    When I choose "Edit question" action for "ordering-002" in the question bank
+    When I am on the "ordering-001" "core_question > edit" page logged in as teacher1
     And I set the following fields to these values:
-      | id_shownumcorrect       | 0 |
+      | id_shownumcorrect | 0                    |
+      | Question name     | Renamed ordering-001 |
     And I press "id_submitbutton"
-    And I choose "Preview" action for "ordering-002" in the question bank
-    And I switch to "questionpreview" window
+    And I am on the "Renamed ordering-001" "core_question > preview" page
+    And I expand all fieldsets
     And I set the field "How questions behave" to "Immediate feedback"
-    And I press "Start again with these options"
+    And I press "id_saverestart"
     And I drag "Modular" to space "1" in the ordering question
-    And I drag "Object" to space "6" in the ordering question
     And I drag "Oriented" to space "4" in the ordering question
     And I drag "Dynamic" to space "3" in the ordering question
     And I drag "Learning" to space "5" in the ordering question

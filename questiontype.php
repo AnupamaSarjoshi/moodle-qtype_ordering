@@ -24,8 +24,6 @@
 
 use qtype_ordering\question_hint_ordering;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * The ordering question type.
  *
@@ -41,7 +39,7 @@ class qtype_ordering extends question_type {
     public $feedbackfields = array('correctfeedback', 'partiallycorrectfeedback', 'incorrectfeedback');
 
     /**
-     * @return whether the question_answers.answer field needs to have
+     * @return bool whether the question_answers.answer field needs to have
      * restore_decode_content_links_worker called on it.
      */
     public function has_html_answers() {
@@ -68,7 +66,19 @@ class qtype_ordering extends question_type {
      * @param object $questiondata the question data loaded from the database.
      */
     protected function initialise_question_instance(question_definition $question, $questiondata) {
+        global $CFG;
+
         parent::initialise_question_instance($question, $questiondata);
+
+        $question->answers = $questiondata->options->answers;
+        foreach ($question->answers as $answerid => $answer) {
+            $question->answers[$answerid]->md5key =
+                    'ordering_item_' . md5(($CFG->passwordsaltmain ?? '') . $answer->answer);
+        }
+
+        $question->options = clone($questiondata->options);
+        unset($question->options->answers);
+
         $this->initialise_combined_feedback($question, $questiondata, true);
     }
 
@@ -366,16 +376,7 @@ class qtype_ordering extends question_type {
             }
 
             $subqid = question_utils::to_plain_text($answer->answer, $answer->answerformat);
-
-            // make sure $subqid is no more than 100 bytes
-            $maxbytes = 100;
-            if (strlen($subqid) > $maxbytes) {
-                $subqid = substr($subqid, 0, $maxbytes);
-                if (preg_match('/^(.|\n)*/u', '', $subqid, $match)) {
-                    $subqid = $match[0]; // incomplete UTF-8 chars will be removed
-                }
-            }
-
+            $subqid = core_text::substr($subqid, 0, 100); // Ensure not more than 100 chars.
             $responseclasses[$subqid] = $classes;
         }
 
@@ -417,9 +418,10 @@ class qtype_ordering extends question_type {
             return false;
         }
 
-        // Load the answers - "fraction" is used to signify the order of the answers.
+        // Load the answers - "fraction" is used to signify the order of the answers,
+        // with id as a tie-break which should not be required.
         if (!$question->options->answers = $DB->get_records('question_answers',
-                array('question' => $question->id), 'fraction ASC')) {
+                array('question' => $question->id), 'fraction, id')) {
             echo $OUTPUT->notification('Error: Missing question answers for ordering question ' . $question->id . '!');
             return false;
         }
@@ -557,10 +559,18 @@ class qtype_ordering extends question_type {
                 if (is_numeric($pos)) {
                     $format = substr($text, 0, $pos);
                     switch ($format) {
-                        case 'html':     $format = FORMAT_HTML;     break;
-                        case 'plain':    $format = FORMAT_PLAIN;    break;
-                        case 'markdown': $format = FORMAT_MARKDOWN; break;
-                        case 'moodle':   $format = FORMAT_MOODLE;   break;
+                        case 'html':
+                            $format = FORMAT_HTML;
+                            break;
+                        case 'plain':
+                            $format = FORMAT_PLAIN;
+                            break;
+                        case 'markdown':
+                            $format = FORMAT_MARKDOWN;
+                            break;
+                        case 'moodle':
+                            $format = FORMAT_MOODLE;
+                            break;
                     }
                     $text = trim(substr($text, $pos + 1)); // Remove name from text.
                 }
@@ -582,7 +592,8 @@ class qtype_ordering extends question_type {
         } else {
             $selectcount = min(6, count($answers));
         }
-        $this->set_options_for_import($question, $layouttype, $selecttype, $selectcount, $gradingtype, $showgrading, $numberingstyle);
+        $this->set_options_for_import($question, $layouttype, $selecttype, $selectcount,
+                                        $gradingtype, $showgrading, $numberingstyle);
 
         // Remove blank items.
         $answers = array_map('trim', $answers);
@@ -734,10 +745,18 @@ class qtype_ordering extends question_type {
         }
 
         switch ($question->questiontextformat) {
-            case FORMAT_HTML:     $output .= '[html]';     break;
-            case FORMAT_PLAIN:    $output .= '[plain]';    break;
-            case FORMAT_MARKDOWN: $output .= '[markdown]'; break;
-            case FORMAT_MOODLE:   $output .= '[moodle]';   break;
+            case FORMAT_HTML:
+                $output .= '[html]';
+                break;
+            case FORMAT_PLAIN:
+                $output .= '[plain]';
+                break;
+            case FORMAT_MARKDOWN:
+                $output .= '[markdown]';
+                break;
+            case FORMAT_MOODLE:
+                $output .= '[moodle]';
+                break;
         }
 
         $output .= $question->questiontext.'{';
@@ -843,7 +862,8 @@ class qtype_ordering extends question_type {
         $gradingtype = $format->getpath($data, array('#', 'gradingtype', 0, '#'), 'RELATIVE');
         $showgrading = $format->getpath($data, array('#', 'showgrading', 0, '#'), '1');
         $numberingstyle = $format->getpath($data, array('#', 'numberingstyle', 0, '#'), '1');
-        $this->set_options_for_import($newquestion, $layouttype, $selecttype, $selectcount, $gradingtype, $showgrading, $numberingstyle);
+        $this->set_options_for_import($newquestion, $layouttype, $selecttype, $selectcount,
+                                        $gradingtype, $showgrading, $numberingstyle);
 
         $newquestion->answer = array();
         $newquestion->answerformat = array();
@@ -923,10 +943,10 @@ class qtype_ordering extends question_type {
      * @param string $grading the grading type
      * @param string $show the grading details or not
      */
-    public function set_options_for_import(&$question, $layouttype, $selecttype, $selectcount, 
+    public function set_options_for_import(&$question, $layouttype, $selecttype, $selectcount,
                                                        $gradingtype, $showgrading, $numberingstyle) {
 
-        // set "layouttype" option
+        // Set "layouttype" option.
         switch (strtoupper($layouttype)) {
 
             case 'HORIZONTAL':
@@ -973,7 +993,7 @@ class qtype_ordering extends question_type {
         if (is_numeric($selectcount)) {
             $question->selectcount = intval($selectcount);
         } else {
-            $question->selectcount = 3; // default
+            $question->selectcount = 3; // Default!
         }
 
         // Set "gradingtype" option.
@@ -1040,7 +1060,7 @@ class qtype_ordering extends question_type {
 
             default:
                 $question->showgrading = 1;
-                break;                
+                break;
         }
 
         // Set "numberingstyle" option.
